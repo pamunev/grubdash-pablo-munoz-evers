@@ -65,7 +65,7 @@ function isNotDeliveredYet(req, res, next) {
 
     if (order.status === "delivered") {
         return next({
-            status: 404,
+            status: 400,
             message: `A delivered order cannot be changed`
         })
     }
@@ -75,13 +75,29 @@ function isNotDeliveredYet(req, res, next) {
 function statusIsPending(req, res, next) {
     const order = res.locals.order
 
-    if (order.status === "pending") {
-        return next()
+    if (order.status !== "pending") {
+        return next({
+            status: 400,
+            message: `An order cannot be deleted or updated unless it is pending.` 
+        })
     }
-    return next({
-        status: 400,
-        message: `An order cannot be deleted unless it is pending.` 
-    })
+    return next() 
+}
+
+function checkIfIdsMatch(req, res, next) {
+    const { orderId } = req.params
+    const { data: { id } = {} } = req.body
+    if (id) {
+        if (id === orderId) {
+            return next()
+        } else {
+            return next({
+                status: 400,
+                message: `Inputted id:${id} must match existing id:${orderId}.`
+            })
+        }
+    }
+    return next()
 }
 
 function create(req, res, next) {
@@ -104,7 +120,14 @@ function read(req, res, next) {
 function update(req, res, next) {
     const order = res.locals.order
     const { data: { deliverTo, mobileNumber, status, dishes } = {} } = req.body
-    
+
+    if (!["pending", "preparing", "out-for-delivery", "delivered"].includes(status)) {
+        return next({
+            status: 400,
+            message: `Invalid status: ${status}. Status must be one of 'pending', 'preparing', 'out-for-delivery', 'delivered'.`
+        })
+    }
+
     order.deliverTo = deliverTo
     order.mobileNumber = mobileNumber
     order.status = status
@@ -137,7 +160,8 @@ module.exports = {
     read: [orderExists, read],
     update: [
         orderExists,
-        isNotDeliveredYet,
+        checkIfIdsMatch,
+        statusIsPending,
         bodyDataHas("deliverTo"),
         bodyDataHas("mobileNumber"),
         bodyDataHas("dishes"),

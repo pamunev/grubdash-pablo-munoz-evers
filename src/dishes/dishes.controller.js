@@ -1,4 +1,5 @@
 const path = require("path");
+const ordersController = require("../orders/orders.controller");
 
 // Use the existing dishes data
 const dishes = require(path.resolve("src/data/dishes-data"));
@@ -48,15 +49,32 @@ function dishExists(req, res, next) {
     })
 }
 
+function checkIfIdsMatch(req, res, next) {
+    const { dishId } = req.params
+    const { data: { id } = {} } = req.body
+    if (id) {
+        if (id === dishId) {
+            return next()
+        } else {
+            return next({
+                status: 400,
+                message: `Inputted id:${id} must match existing id:${dishId}.`
+            })
+        }
+    }
+    return next()
+}
+
 function create(req, res, next) {
-    const { data: { name, description, price, image_url }} = req.body
+    const { data: { name, description, price, image_url } = {} } = req.body
     const newDish = {
         id: nextId(), // not sure how to use this function.
         name,
         description,
+        image_url,
         price,
-        image_url
     }
+    dishes.push(newDish)
     res.status(201).json({ data: newDish })
 }
 
@@ -93,6 +111,7 @@ module.exports = {
     read: [dishExists, read],
     update: [
         dishExists,
+        checkIfIdsMatch,
         bodyDataHas("name"),
         bodyDataHas("description"),
         bodyDataHas("price"),
